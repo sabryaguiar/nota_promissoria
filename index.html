@@ -18,6 +18,12 @@
     .panel h2 { margin:0 0 14px; font-size:18px; }
     .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
     label { display:flex; flex-direction:column; gap:5px; font-size:12px; font-weight:700; text-transform:uppercase; }
+    .label-text { display:inline-block; }
+    .required-star { color:#d10000; font-weight:900; margin-left:2px; }
+    label.is-invalid { color:#b00020; }
+    input.is-invalid, textarea.is-invalid, select.is-invalid { border-color:#d10000 !important; background:#fff6f6; box-shadow:0 0 0 2px rgba(209,0,0,.10); }
+    .error-message { display:none; color:#b00020; font-size:12px; font-weight:700; margin:8px 0 2px; line-height:1.35; }
+    .error-message.show { display:block; }
     input, textarea, select { border:1px solid #bbb; border-radius:8px; padding:10px; font-size:14px; outline:none; background:#fff; }
     input:focus, textarea:focus, select:focus { border-color:var(--gold); box-shadow:0 0 0 2px rgba(216,144,0,.15); }
     .full { grid-column:1 / -1; }
@@ -120,22 +126,23 @@
     <section class="panel">
       <h2>Preencha os dados</h2>
       <div class="grid">
-        <label>Data da compra <input id="dataCompra" type="date"></label>
-        <label>Quantidade de parcelas <input id="qtdParcelas" type="number" min="1" value="3"></label>
-        <label>Valor do veículo <input id="valorVeiculo" inputmode="decimal" placeholder="Ex: 12.000,00"></label>
+        <label><span class="label-text">Data da compra<span class="required-star">*</span></span><input id="dataCompra" type="date" required></label>
+        <label><span class="label-text">Quantidade de parcelas<span class="required-star">*</span></span><input id="qtdParcelas" type="number" min="1" value="3" required></label>
+        <label><span class="label-text">Valor do veículo<span class="required-star">*</span></span><input id="valorVeiculo" inputmode="decimal" placeholder="Ex: 12.000,00" required></label>
         <label>Entrada <input id="entrada" inputmode="decimal" placeholder="Ex: 2.000,00"></label>
-        <label>Parcela <input id="valorParcela" inputmode="decimal" placeholder="Ex: 325,00"></label>
-        <label>Vencimento - dia <input id="diaVencimento" type="text" inputmode="numeric" maxlength="2" value="05" placeholder="05"></label>
-        <label class="full">Nome do comprador <input id="nome" autocomplete="name" placeholder="Nome completo"></label>
-        <label class="full">CPF/CNPJ <input id="cpf" inputmode="numeric" maxlength="18" placeholder="000.000.000-00"></label>
-        <label class="full">Endereço <input id="endereco" autocomplete="street-address" placeholder="Rua, número, bairro"></label>
-        <label>Cidade/UF <input id="cidadeUf" placeholder="Fortaleza/CE"></label>
-        <label>CEP <input id="cep" inputmode="numeric" maxlength="9" placeholder="00000-000"></label>
-        <label>Placa veículo vendido <input id="placaVendido" maxlength="8" placeholder="ABC1D23"></label>
+        <label><span class="label-text">Parcela<span class="required-star">*</span></span><input id="valorParcela" inputmode="decimal" placeholder="Ex: 325,00" required></label>
+        <label><span class="label-text">Vencimento - dia<span class="required-star">*</span></span><input id="diaVencimento" type="text" inputmode="numeric" maxlength="2" value="05" placeholder="05" required></label>
+        <label class="full"><span class="label-text">Nome do comprador<span class="required-star">*</span></span><input id="nome" autocomplete="name" placeholder="Nome completo" required></label>
+        <label class="full"><span class="label-text">CPF/CNPJ<span class="required-star">*</span></span><input id="cpf" inputmode="numeric" maxlength="18" placeholder="000.000.000-00" required></label>
+        <label class="full"><span class="label-text">Endereço<span class="required-star">*</span></span><input id="endereco" autocomplete="street-address" placeholder="Rua, número, bairro" required></label>
+        <label><span class="label-text">Cidade/UF<span class="required-star">*</span></span><input id="cidadeUf" placeholder="Fortaleza/CE" required></label>
+        <label><span class="label-text">CEP<span class="required-star">*</span></span><input id="cep" inputmode="numeric" maxlength="9" placeholder="00000-000" required></label>
+        <label><span class="label-text">Placa veículo vendido<span class="required-star">*</span></span><input id="placaVendido" maxlength="8" placeholder="ABC1D23" required></label>
         <label>Placa recebida entrada <input id="placaEntrada" maxlength="8" placeholder="Opcional"></label>
-        <label class="full">Data da 1ª parcela <input id="dataPrimeiraParcela" type="date"></label>
+        <label class="full"><span class="label-text">Data da 1ª parcela<span class="required-star">*</span></span><input id="dataPrimeiraParcela" type="date" required></label>
       </div>
-      <button class="secondary" onclick="montarPreview()">Atualizar visualização</button>
+      <p id="formError" class="error-message">Preencha os campos obrigatórios marcados com *.</p>
+      <button class="secondary" onclick="montarPreview(true)">Atualizar visualização</button>
       <button class="primary" onclick="gerarPDF()">Baixar PDF A4 paisagem</button>
       <p class="hint">O PDF é criado com 3 notas por página A4 em paisagem. Cada parcela recebe automaticamente o número da parcela e a data mensal.</p>
     </section>
@@ -229,7 +236,29 @@
         </div>`;
     }
 
-    function montarPreview() {
+    const CAMPOS_OBRIGATORIOS = [
+      'dataCompra', 'qtdParcelas', 'valorVeiculo', 'valorParcela', 'diaVencimento',
+      'nome', 'cpf', 'endereco', 'cidadeUf', 'cep', 'placaVendido', 'dataPrimeiraParcela'
+    ];
+
+    function validarObrigatorios(mostrarMensagem = false) {
+      let valido = true;
+      CAMPOS_OBRIGATORIOS.forEach(id => {
+        const campo = document.getElementById(id);
+        const label = campo.closest('label');
+        const vazio = !campo.value.trim();
+        campo.classList.toggle('is-invalid', vazio);
+        if (label) label.classList.toggle('is-invalid', vazio);
+        if (vazio) valido = false;
+      });
+
+      const erro = document.getElementById('formError');
+      if (erro) erro.classList.toggle('show', mostrarMensagem && !valido);
+      return valido;
+    }
+
+    function montarPreview(mostrarMensagem = false) {
+      validarObrigatorios(mostrarMensagem);
       const root = document.getElementById('pdfRoot');
       const qtd = Math.max(1, Number(v('qtdParcelas') || 1));
       const primeira = v('dataPrimeiraParcela');
@@ -245,7 +274,12 @@
     }
 
     async function gerarPDF() {
-      montarPreview();
+      if (!validarObrigatorios(true)) {
+        const primeiroErro = document.querySelector('input.is-invalid, textarea.is-invalid, select.is-invalid');
+        if (primeiroErro) primeiroErro.focus();
+        return;
+      }
+      montarPreview(false);
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
       const pages = document.querySelectorAll('.a4-page');
@@ -329,7 +363,7 @@
     }
 
     configurarMascaras();
-    document.addEventListener('input', () => montarPreview());
+    document.addEventListener('input', () => { validarObrigatorios(false); montarPreview(false); });
     montarPreview();
   </script>
 </body>
